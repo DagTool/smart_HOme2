@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "941940225099",
+    "project_id": "henhung-99234",
+    "storage_bucket": "henhung-99234.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:941940225099:android:41fedd65e72e8dad0ac9ce",
+        "android_client_info": {
+          "package_name": "com.example.smart_home_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAnO3-W3iNpJ9Y1JDqHLGcZAGvZFbFPsc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
