@@ -13,8 +13,8 @@
 #include <Stepper.h>
 
 // ===== WIFI + FIREBASE CONFIG =====
-#define WIFI_SSID "Tro 1046 QT YN T3"
-#define WIFI_PASSWORD "123456a@"
+#define WIFI_SSID "Quang Vinh"
+#define WIFI_PASSWORD "66668888"
 #define DATABASE_URL "https://henhung-99234-default-rtdb.asia-southeast1.firebasedatabase.app/"
 #define DATABASE_SECRET "vhJUpPpyiFbtWKkTWQWB8e9ZlPlnV3VubODxXd6W"
 
@@ -80,6 +80,8 @@ bool lightStatus = false;
 bool windowStatus = false;
 bool gateStatus = false;
 bool doorStatus = false;
+bool isDoorWaiting = false;
+bool isAuthenticated = false;
 bool acStatus = false;
 bool isRaining = false;
 unsigned long lastManualAction = 0;    // Lưu thời điểm cuối cùng bấm nút/app
@@ -115,10 +117,9 @@ void streamCallback(FirebaseStream data) {
     doorStatus = data.intData();
     Serial.println("Door: " + String(doorStatus));
     
-    if (doorStatus == 1 && lockUntil == 0) {
-      openDoor();
-      Firebase.RTDB.setInt(&fbdo, basePath + "/device_control/door_status", 0);
-    }
+    // Chỉ điều khiển Servo, KHÔNG gọi hàm openDoor() để tránh tiếng kêu lặp lại
+    moveServo(doorStatus ? 90 : 0); 
+    digitalWrite(LED_XANH, doorStatus); // Đèn xanh sáng khi cửa mở, tắt khi cửa đóng
   }
   
   // 💡 LIGHT CONTROL
@@ -251,30 +252,33 @@ void syncCardsToFirebase() {
 
 void openDoor() {
   lcd.clear(); 
-  lcd.print("Door OPEN");
-  sendLog("Door Opened"); 
+  lcd.print("Door OPENED");
+  lcd.setCursor(0, 1);
+  lcd.print("Press A to Close"); // Thông báo cho người dùng biết
   
   moveServo(90); 
   beepOK(); 
   
-  // Cập nhật Firebase
+  isDoorWaiting = true; // Đánh dấu là cửa đang mở và đang đợi
+
   if (Firebase.ready()) {
     Firebase.RTDB.setInt(&fbdo, basePath + "/device_control/door_status", 1);
   }
-  
-  delay(3000); 
+  sendLog("Door Opened - Waiting for Manual Close");
+}
+
+void closeDoor() {
   moveServo(0);
-  
-  lcd.clear(); 
-  lcd.print("Door CLOSED");
-  sendLog("Door Closed"); 
-  
-  // Cập nhật Firebase
+  isDoorWaiting = false; // Reset trạng thái
+
   if (Firebase.ready()) {
     Firebase.RTDB.setInt(&fbdo, basePath + "/device_control/door_status", 0);
   }
-  
-  delay(1000);
+
+  lcd.clear(); 
+  lcd.print("Door CLOSED");
+  sendLog("Door Closed via Keypad"); 
+  delay(1500);
   showNormalScreen();
 }
 
@@ -348,21 +352,48 @@ bool deleteCard(String uid) {
 
 void updateOTPToFirebase() {
   static unsigned long lastOTPUpdate = 0;
-  
+  static uint32_t lastSeconds = 0; // Lưu giây cuối cùng để tránh gửi trùng
+
+  // Chỉ chạy mỗi 1 giây
   if (millis() - lastOTPUpdate > 1000) {
     lastOTPUpdate = millis();
     
     if (!Firebase.ready()) return;
-    
-    long utcOffset = 7 * 3600;
-    RtcDateTime now = Rtc.GetDateTime();
-    String currentOTP = String(totp.getCode(now.TotalSeconds() - utcOffset));
-    while (currentOTP.length() < 6) currentOTP = "0" + currentOTP;
 
-    Firebase.RTDB.setString(&fbdo, basePath + "/status/current_otp", currentOTP);
+    RtcDateTime now = Rtc.GetDateTime();
     
-    int countdown = 30 - (now.TotalSeconds() % 30);
-    Firebase.RTDB.setInt(&fbdo, basePath + "/status/otp_countdown", countdown);
+    // KIỂM TRA HỢP LỆ: Nếu RTC trả về năm quá cũ hoặc không chạy, bỏ qua
+    if (!now.IsValid() || now.Year() < 2024) {
+      Serial.println("⚠️ RTC Error: Invalid data!");
+      return; 
+    }
+
+    uint32_t currentSeconds = now.TotalSeconds();
+    
+    // CHỈ CẬP NHẬT KHI GIÂY THAY ĐỔI
+    if (currentSeconds != lastSeconds) {
+      lastSeconds = currentSeconds;
+
+      // Sinh OTP chuẩn
+      String currentOTP = String(totp.getCode(currentSeconds));
+      while (currentOTP.length() < 6) currentOTP = "0" + currentOTP;
+
+      // Tính countdown
+      int countdown = 30 - (currentSeconds % 30);
+
+      // Gửi đồng thời lên Firebase (Dùng set thay vì đẩy lẻ tẻ để tránh lag)
+      FirebaseJson json;
+      json.set("current_otp", currentOTP);
+      json.set("otp_countdown", countdown);
+      
+      // Gửi một gói JSON duy nhất để tiết kiệm băng thông và tránh nhảy số
+      Firebase.RTDB.updateNode(&fbdo, basePath + "/status", &json);
+      
+      // Debug ra Serial để bạn soi xem giây có chạy mượt không
+      Serial.printf("⏰ RTC: %02d:%02d:%02d | OTP: %s | CD: %ds\n", 
+                    now.Hour(), now.Minute(), now.Second(), 
+                    currentOTP.c_str(), countdown);
+    }
   }
 }
 
@@ -387,6 +418,17 @@ void setup() {
   
   nfc.begin(); 
   nfc.SAMConfig();
+
+  // Trong hàm setup(), hãy sửa lại đoạn khởi tạo RTC:
+  Rtc.Begin();
+  Rtc.SetIsWriteProtected(false); // Cho phép ghi vào RTC
+  Rtc.SetIsRunning(true);         // Ép đồng hồ chạy
+
+  RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+  if (!Rtc.IsDateTimeValid()) {
+      // Nếu dữ liệu không hợp lệ, set lại giờ lúc biên dịch code
+      Rtc.SetDateTime(compiled);
+  }
   
   // ✅ FIX: Dùng ledcAttach thay vì ledcAttachPin (ESP32 Core 3.x)
   ledcAttach(SERVO_PIN, 50, 14); // pin, freq, resolution
@@ -585,7 +627,12 @@ void loop() {
       }
 
       if (cardExists(uidStr)) {
-        openDoor();
+        isAuthenticated = true; // Bật chế độ chờ bấm phím
+        beepOK();
+        lcd.clear();
+        lcd.print("CHON THIET BI:");
+        lcd.setCursor(0, 1);
+        lcd.print("A: Cua  B: Co So");
       } else { 
         lcd.clear(); 
         lcd.print("Denied"); 
@@ -637,13 +684,56 @@ void loop() {
           isRaining = false;
       }
   }
-
-  delay(100);
 }
 
 void handleKeypad(char key) {
   tone(BUZZER_PIN, 3000, 50);
   
+  if (isAuthenticated) {
+      if (key == 'A') {
+          doorStatus = !doorStatus; // Đảo trạng thái 0 <-> 1
+          moveServo(doorStatus ? 90 : 0);
+          digitalWrite(LED_XANH, doorStatus); 
+          
+          lcd.clear();
+          lcd.print(doorStatus ? "Cua: DANG MO" : "Cua: DANG DONG");
+          lcd.setCursor(0, 1);
+          lcd.print(doorStatus ? "Bam A de DONG" : "Bam B:So D:Thoat"); // Hướng dẫn sử dụng
+          
+          if (Firebase.ready()) {
+              Firebase.RTDB.setInt(&fbdo, basePath + "/device_control/door_status", doorStatus);
+          }
+          sendLog(doorStatus ? "Door OPEN via Keypad" : "Door CLOSE via Keypad");
+
+          // QUAN TRỌNG: Không có dòng isAuthenticated = false ở đây 
+          // để bạn có thể bấm A thêm lần nữa (hoặc nhiều lần) tùy thích.
+          return; 
+      }
+
+      if (key == 'B') {
+          windowStatus = !windowStatus; // Đảo trạng thái cửa sổ
+          moveWindow(windowStatus ? 90 : 0);
+          
+          lcd.clear();
+          lcd.print(windowStatus ? "So: DANG MO" : "So: DANG DONG");
+          sendLog(windowStatus ? "Window OPEN via Keypad" : "Window CLOSE via Keypad");
+          
+          if (Firebase.ready()) Firebase.RTDB.setInt(&fbdo, basePath + "/device_control/window_status", windowStatus);
+          
+          delay(1000);
+          isAuthenticated = false; // Xong việc, thoát chế độ điều khiển
+          showNormalScreen();
+          return;
+      }
+      
+      if (key == 'D') { // Bấm D để hủy nếu quẹt nhầm
+          isAuthenticated = false;
+          showNormalScreen();
+          return;
+      }
+      return; // Nếu bấm phím khác (1, 2, 3...) thì không làm gì, vẫn chờ bấm A/B
+  }
+
   if (key == 'D') {
     if (currentMode != MODE_NORMAL) {
       currentMode = MODE_NORMAL;
@@ -805,9 +895,9 @@ void handleKeypad(char key) {
     }
 
     // Xử lý mở cửa bằng PIN/OTP
-    long utcOffset = 7 * 3600;
-    String currentOTP = String(totp.getCode(Rtc.GetDateTime().TotalSeconds() - utcOffset));
-    while (currentOTP.length() < 6) currentOTP = "0" + currentOTP; 
+    RtcDateTime now = Rtc.GetDateTime();
+  String currentOTP = String(totp.getCode(now.TotalSeconds())); // BỎ trừ offset
+  while (currentOTP.length() < 6) currentOTP = "0" + currentOTP;
 
     if (input == password) {
       failCount = 0; 

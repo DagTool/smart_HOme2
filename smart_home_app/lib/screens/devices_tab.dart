@@ -85,8 +85,8 @@ class DevicesTab extends StatelessWidget {
                 icon: Icons.door_front_door_rounded,
                 active: state.door,
                 accentColor: const Color(0xFF10B981),
-                subtitle: 'Nhấn để mở',
-                onTap: () => _confirmOpenDoor(context, devices),
+                subtitle: state.door ? 'Đang mở' : 'Đã đóng',
+                onTap: () => devices.toggleDoor(),
               ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1),
               DeviceCard(
                 label: 'Cửa sổ',
@@ -227,39 +227,6 @@ class DevicesTab extends StatelessWidget {
             ).animate().fadeIn(delay: 300.ms),
           ],
           const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-
-  void _confirmOpenDoor(BuildContext context, DeviceProvider devices) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A2235),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Mở cửa?', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'Xác nhận mở cửa ra vào. ESP32 sẽ nhận lệnh và tự đóng sau 3 giây.',
-          style: TextStyle(color: Colors.white60),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Huỷ', style: TextStyle(color: Colors.white38)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              devices.openDoor();
-            },
-            child: const Text('Mở cửa'),
-          ),
         ],
       ),
     );

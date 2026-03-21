@@ -63,9 +63,9 @@ class DeviceProvider extends ChangeNotifier {
         _state.light ? 'Light OFF via App' : 'Light ON via App',
       );
 
-  Future<void> openDoor() => _run(
-        () => _service.setDoor(_houseId!, true),
-        'Door opened via App',
+  Future<void> toggleDoor() => _run(
+        () => _service.setDoor(_houseId!, !_state.door),
+        _state.door ? 'Door CLOSE via App' : 'Door OPEN via App',
       );
 
   Future<void> toggleWindow() => _run(
