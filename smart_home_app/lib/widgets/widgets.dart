@@ -270,7 +270,7 @@ class OtpDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = countdown / 30.0;
+    final progress = countdown / 120.0;
     final color = progress > 0.4
         ? const Color(0xFF10B981)
         : const Color(0xFFF59E0B);
