@@ -267,8 +267,10 @@ class DevicesTab extends StatelessWidget {
 
   void _showChangePasswordDialog(
       BuildContext context, DeviceProvider devices) {
+    final oldPassCtrl = TextEditingController();
     final newPassCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
+    final hasOldPass = devices.state.masterPassword.isNotEmpty;
 
     showDialog(
       context: context,
@@ -280,6 +282,15 @@ class DevicesTab extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (hasOldPass) ...[
+              AppTextField(
+                controller: oldPassCtrl,
+                label: 'Mật khẩu cũ',
+                obscure: true,
+                prefixIcon: Icons.lock_outline_rounded,
+              ),
+              const SizedBox(height: 12),
+            ],
             AppTextField(
               controller: newPassCtrl,
               label: 'Mật khẩu mới (≥6 ký tự)',
@@ -307,6 +318,16 @@ class DevicesTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () {
+              if (hasOldPass && oldPassCtrl.text != devices.state.masterPassword) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Mật khẩu cũ không chính xác'),
+                    backgroundColor: Color(0xFFEF4444),
+                  ),
+                );
+                return;
+              }
+
               final np = newPassCtrl.text;
               if (np.length < 6) {
                 ScaffoldMessenger.of(context).showSnackBar(
