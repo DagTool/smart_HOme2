@@ -79,7 +79,7 @@ class FirebaseService {
       'status': {
         'esp32_status': 'offline',
         'current_otp': '------',
-        'otp_countdown': 30,
+        'otp_countdown': 120,
         'last_event': 'Home created',
         'registered_cards': 'No cards',
         'card_count': 0,

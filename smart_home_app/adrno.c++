@@ -34,7 +34,7 @@ uint8_t hmacKey[] = {
   0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 
   0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30 
 };
-TOTP totp = TOTP(hmacKey, 20);
+TOTP totp = TOTP(hmacKey, 20, 120);
 
 Preferences prefs;
 
@@ -379,7 +379,7 @@ void updateOTPToFirebase() {
       while (currentOTP.length() < 6) currentOTP = "0" + currentOTP;
 
       // Tính countdown
-      int countdown = 30 - (currentSeconds % 30);
+      int countdown = 120 - (currentSeconds % 120);
 
       // Gửi đồng thời lên Firebase (Dùng set thay vì đẩy lẻ tẻ để tránh lag)
       FirebaseJson json;

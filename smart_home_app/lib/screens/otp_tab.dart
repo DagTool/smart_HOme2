@@ -79,7 +79,7 @@ class OtpTab extends StatelessWidget {
                 number: '1',
                 icon: Icons.phone_android_rounded,
                 title: 'Xem mã OTP',
-                desc: 'Mã 6 số được làm mới mỗi 30 giây theo chuẩn TOTP',
+                desc: 'Mã 6 số được làm mới mỗi 120 giây theo chuẩn TOTP',
               ),
               const Divider(color: Colors.white10, height: 20),
               _StepRow(
