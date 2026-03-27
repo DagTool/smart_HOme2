@@ -1,4 +1,4 @@
-# SmartHome2
+# SmartHome
 
 A Flutter-based smart home application built with Dart for controlling and managing IoT devices in your home.
 
