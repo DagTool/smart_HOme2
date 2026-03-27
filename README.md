@@ -123,7 +123,3 @@ For support, open an issue on the [GitHub Issues](https://github.com/DangDacTu/s
 
 **DangDacTu**
 - GitHub: [@DangDacTu](https://github.com/DangDacTu)
-
----
-
-**Last Updated**: 2026-03-27 09:09:51
